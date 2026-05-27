@@ -6,7 +6,6 @@ package badgerhold
 
 import (
 	"reflect"
-	"strings"
 	"sync"
 
 	"github.com/dgraph-io/badger/v4"
@@ -55,42 +54,17 @@ var DefaultOptions = Options{
 }
 
 // Open opens or creates a badgerhold file.
-func Open(options Options) (*Store, error) {
-	db, err := badger.Open(options.Options)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Store{
-		db:               db,
-		sequenceBandwith: options.SequenceBandwith,
-		sequences:        &sync.Map{},
-
-		encode: options.Encoder,
-		decode: options.Decoder,
-	}, nil
-}
+func Open(options Options) (*Store, error) { _ = "STUB: not implemented"; return nil, nil }
 
 // Badger returns the underlying Badger DB the badgerhold is based on
 func (s *Store) Badger() *badger.DB {
-	return s.db
+	_ = "STUB: not implemented"
+
+	// Close closes the badger db
+	return nil
 }
 
-// Close closes the badger db
-func (s *Store) Close() error {
-	var err error
-	s.sequences.Range(func(key, value interface{}) bool {
-		err = value.(*badger.Sequence).Release()
-		if err != nil {
-			return false
-		}
-		return true
-	})
-	if err != nil {
-		return err
-	}
-	return s.db.Close()
-}
+func (s *Store) Close() error { _ = "STUB: not implemented"; return nil }
 
 /*
 	NOTE: Not going to implement ReIndex and Remove index
@@ -113,126 +87,38 @@ type anonStorer struct {
 }
 
 // Type returns the name of the type as determined from the reflect package
-func (t *anonStorer) Type() string {
-	return t.rType.Name()
-}
+func (t *anonStorer) Type() string { _ = "STUB: not implemented"; return "" }
 
 // Indexes returns the Indexes determined by the reflect package on this type
 func (t *anonStorer) Indexes() map[string]Index {
-	return t.indexes
+	_ = "STUB: not implemented"
+
+	// newStorer creates a type which satisfies the Storer interface based on reflection of the passed in dataType
+	// if the Type doesn't meet the requirements of a Storer (i.e. doesn't have a name) it panics
+	// You can avoid any reflection costs, by implementing the Storer interface on a type
+	return nil
 }
 
-// newStorer creates a type which satisfies the Storer interface based on reflection of the passed in dataType
-// if the Type doesn't meet the requirements of a Storer (i.e. doesn't have a name) it panics
-// You can avoid any reflection costs, by implementing the Storer interface on a type
 func (s *Store) newStorer(dataType interface{}) Storer {
-	if storer, ok := dataType.(Storer); ok {
-		return storer
-	}
-
-	tp := reflect.TypeOf(dataType)
-
-	for tp.Kind() == reflect.Ptr {
-		tp = tp.Elem()
-	}
-
-	storer := &anonStorer{
-		rType:   tp,
-		indexes: make(map[string]Index),
-	}
-
-	if storer.rType.Name() == "" {
-		panic("Invalid Type for Storer.  Type is unnamed")
-	}
-
-	if storer.rType.Kind() != reflect.Struct {
-		panic("Invalid Type for Storer.  BadgerHold only works with structs")
-	}
-
-	for i := 0; i < storer.rType.NumField(); i++ {
-
-		indexName := ""
-		unique := false
-
-		if strings.Contains(string(storer.rType.Field(i).Tag), BadgerHoldIndexTag) {
-			indexName = storer.rType.Field(i).Tag.Get(BadgerHoldIndexTag)
-
-			if indexName != "" {
-				indexName = storer.rType.Field(i).Name
-			}
-		} else if tag := storer.rType.Field(i).Tag.Get(badgerholdPrefixTag); tag != "" {
-			if tag == badgerholdPrefixIndexValue {
-				// indexName is stored canonically as the field name NOT the name in the tag
-				indexName = storer.rType.Field(i).Name
-			} else if tag == badgerholdPrefixUniqueValue {
-				indexName = storer.rType.Field(i).Name
-				unique = true
-			}
-		}
-
-		if indexName != "" {
-			storer.indexes[indexName] = Index{
-				IndexFunc: func(name string, value interface{}) ([]byte, error) {
-					tp := reflect.ValueOf(value)
-					for tp.Kind() == reflect.Ptr {
-						tp = tp.Elem()
-					}
-
-					return s.encode(tp.FieldByName(name).Interface())
-				},
-				Unique: unique,
-			}
-		}
-	}
-
-	return storer
+	_ = "STUB: not implemented"
+	return *new(Storer)
 }
+
+// indexName is stored canonically as the field name NOT the name in the tag
 
 func (s *Store) getSequence(typeName string) (uint64, error) {
-	seq, ok := s.sequences.Load(typeName)
-	if !ok {
-		newSeq, err := s.Badger().GetSequence([]byte(typeName), s.sequenceBandwith)
-		if err != nil {
-			return 0, err
-		}
-		s.sequences.Store(typeName, newSeq)
-		seq = newSeq
-	}
-
-	return seq.(*badger.Sequence).Next()
+	_ = "STUB: not implemented"
+	return 0, nil
 }
 
-func typePrefix(typeName string) []byte {
-	return []byte("bh_" + typeName + ":")
-}
+func typePrefix(typeName string) []byte { _ = "STUB: not implemented"; return nil }
 
 func getKeyField(tp reflect.Type) (reflect.StructField, bool) {
-	for i := 0; i < tp.NumField(); i++ {
-		if strings.HasPrefix(string(tp.Field(i).Tag), BadgerholdKeyTag) {
-			return tp.Field(i), true
-		}
-
-		if tag := tp.Field(i).Tag.Get(badgerholdPrefixTag); tag == badgerholdPrefixKeyValue {
-			return tp.Field(i), true
-		}
-	}
-
-	return reflect.StructField{}, false
+	_ = "STUB: not implemented"
+	return *new(reflect.StructField), false
 }
 
-func newElemType(datatype interface{}) interface{} {
-	tp := reflect.TypeOf(datatype)
-	for tp.Kind() == reflect.Ptr {
-		tp = tp.Elem()
-	}
-
-	return reflect.New(tp).Interface()
-}
+func newElemType(datatype interface{}) interface{} { _ = "STUB: not implemented"; return nil }
 
 // makes sure that interface your working with is not a pointer
-func getElem(value interface{}) interface{} {
-	for reflect.TypeOf(value).Kind() == reflect.Ptr {
-		value = reflect.ValueOf(value).Elem().Interface()
-	}
-	return value
-}
+func getElem(value interface{}) interface{} { _ = "STUB: not implemented"; return nil }

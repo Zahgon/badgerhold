@@ -5,10 +5,6 @@
 package badgerhold
 
 import (
-	"bytes"
-	"reflect"
-	"sort"
-
 	"github.com/dgraph-io/badger/v4"
 )
 
@@ -25,151 +21,56 @@ type Index struct {
 
 // adds an item to the index
 func (s *Store) indexAdd(storer Storer, tx *badger.Txn, key []byte, data interface{}) error {
-	indexes := storer.Indexes()
-	for name, index := range indexes {
-		err := s.indexUpdate(storer.Type(), name, index, tx, key, data, false)
-		if err != nil {
-			return err
-		}
-	}
-
+	_ = "STUB: not implemented"
 	return nil
 }
 
 // removes an item from the index
 // be sure to pass the data from the old record, not the new one
 func (s *Store) indexDelete(storer Storer, tx *badger.Txn, key []byte, originalData interface{}) error {
-	indexes := storer.Indexes()
-
-	for name, index := range indexes {
-		err := s.indexUpdate(storer.Type(), name, index, tx, key, originalData, true)
-		if err != nil {
-			return err
-		}
-	}
-
+	_ = "STUB: not implemented"
 	return nil
 }
 
 // adds or removes a specific index on an item
 func (s *Store) indexUpdate(typeName, indexName string, index Index, tx *badger.Txn, key []byte, value interface{},
 	delete bool) error {
-
-	indexKey, err := index.IndexFunc(indexName, value)
-	if err != nil {
-		return err
-	}
-	if indexKey == nil {
-		return nil
-	}
-
-	indexValue := make(KeyList, 0)
-
-	indexKey = append(indexKeyPrefix(typeName, indexName), indexKey...)
-
-	item, err := tx.Get(indexKey)
-	if err != nil && err != badger.ErrKeyNotFound {
-		return err
-	}
-
-	if err != badger.ErrKeyNotFound {
-		if index.Unique && !delete {
-			return ErrUniqueExists
-		}
-		err = item.Value(func(iVal []byte) error {
-			return s.decode(iVal, &indexValue)
-		})
-		if err != nil {
-			return err
-		}
-	}
-
-	if delete {
-		indexValue.remove(key)
-	} else {
-		indexValue.add(key)
-	}
-
-	if len(indexValue) == 0 {
-		return tx.Delete(indexKey)
-	}
-
-	iVal, err := s.encode(indexValue)
-	if err != nil {
-		return err
-	}
-
-	return tx.Set(indexKey, iVal)
+	_ = "STUB: not implemented"
+	return nil
 }
 
 // indexKeyPrefix returns the prefix of the badger key where this index is stored
-func indexKeyPrefix(typeName, indexName string) []byte {
-	return []byte(indexPrefix + ":" + typeName + ":" + indexName + ":")
-}
+func indexKeyPrefix(typeName, indexName string) []byte { _ = "STUB: not implemented"; return nil }
 
 // newIndexKey returns the badger key where this index is stored
 func newIndexKey(typeName, indexName string, value []byte) []byte {
-	return append(indexKeyPrefix(typeName, indexName), value...)
+	_ = "STUB: not implemented"
+	return nil
 }
 
 // KeyList is a slice of unique, sorted keys([]byte) such as what an index points to
 type KeyList [][]byte
 
-func (v *KeyList) add(key []byte) {
-	i := sort.Search(len(*v), func(i int) bool {
-		return bytes.Compare((*v)[i], key) >= 0
-	})
+func (v *KeyList) add(key []byte) { _ = "STUB: not implemented"; return }
 
-	if i < len(*v) && bytes.Equal((*v)[i], key) {
-		// already added
-		return
-	}
+// already added
 
-	*v = append(*v, nil)
-	copy((*v)[i+1:], (*v)[i:])
-	(*v)[i] = key
-}
+func (v *KeyList) remove(key []byte) { _ = "STUB: not implemented"; return }
 
-func (v *KeyList) remove(key []byte) {
-	i := sort.Search(len(*v), func(i int) bool {
-		return bytes.Compare((*v)[i], key) >= 0
-	})
-
-	if i < len(*v) {
-		copy((*v)[i:], (*v)[i+1:])
-		(*v)[len(*v)-1] = nil
-		*v = (*v)[:len(*v)-1]
-	}
-}
-
-func (v *KeyList) in(key []byte) bool {
-	i := sort.Search(len(*v), func(i int) bool {
-		return bytes.Compare((*v)[i], key) >= 0
-	})
-
-	return (i < len(*v) && bytes.Equal((*v)[i], key))
-}
+func (v *KeyList) in(key []byte) bool { _ = "STUB: not implemented"; return false }
 
 func indexExists(it *badger.Iterator, typeName, indexName string) bool {
-	iPrefix := indexKeyPrefix(typeName, indexName)
-	tPrefix := typePrefix(typeName)
-	// test if any data exists for type
-	it.Seek(tPrefix)
-	if !it.ValidForPrefix(tPrefix) {
-		// store is empty for this data type so the index could possibly exist
-		// we don't want to fail on a "bad index" because they could simply be running a query against
-		// an empty dataset
-		return true
-	}
-
-	// test if an index exists
-	it.Seek(iPrefix)
-	if it.ValidForPrefix(iPrefix) {
-		return true
-	}
-
+	_ = "STUB: not implemented"
 	return false
 }
+
+// test if any data exists for type
+
+// store is empty for this data type so the index could possibly exist
+// we don't want to fail on a "bad index" because they could simply be running a query against
+// an empty dataset
+
+// test if an index exists
 
 type iterator struct {
 	keyCache [][]byte
@@ -189,185 +90,32 @@ type iterBookmark struct {
 }
 
 func (s *Store) newIterator(tx *badger.Txn, typeName string, query *Query, bookmark *iterBookmark) *iterator {
-	i := &iterator{
-		tx: tx,
-	}
-
-	if bookmark != nil {
-		i.iter = bookmark.iter
-	} else {
-		i.iter = tx.NewIterator(badger.DefaultIteratorOptions)
-	}
-
-	var prefix []byte
-
-	if query.index != "" {
-		query.badIndex = !indexExists(i.iter, typeName, query.index)
-	}
-
-	criteria := query.fieldCriteria[query.index]
-	if hasMatchFunc(criteria) {
-		// can't use indexes on matchFuncs as the entire record isn't available for testing in the passed
-		// in function
-		criteria = nil
-	}
-
-	// Key field or index not specified - test key against criteria (if it exists) or return everything
-	if query.index == "" || len(criteria) == 0 {
-		prefix = typePrefix(typeName)
-		i.iter.Seek(prefix)
-		i.nextKeys = func(iter *badger.Iterator) ([][]byte, error) {
-			var nKeys [][]byte
-
-			for len(nKeys) < iteratorKeyMinCacheSize {
-				if !iter.ValidForPrefix(prefix) {
-					return nKeys, nil
-				}
-
-				item := iter.Item()
-				key := item.KeyCopy(nil)
-				var ok bool
-				if len(criteria) == 0 {
-					// nothing to check return key for value testing
-					ok = true
-				} else {
-
-					val := reflect.New(query.dataType)
-
-					err := item.Value(func(v []byte) error {
-						return s.decode(v, val.Interface())
-					})
-					if err != nil {
-						return nil, err
-					}
-
-					ok, err = s.matchesAllCriteria(criteria, key, true, typeName, val.Interface())
-					if err != nil {
-						return nil, err
-					}
-				}
-
-				if ok {
-					nKeys = append(nKeys, key)
-
-				}
-				i.lastSeek = key
-				iter.Next()
-			}
-			return nKeys, nil
-		}
-
-		return i
-	}
-
-	// indexed field, get keys from index
-	prefix = indexKeyPrefix(typeName, query.index)
-	i.iter.Seek(prefix)
-	i.nextKeys = func(iter *badger.Iterator) ([][]byte, error) {
-		var nKeys [][]byte
-
-		for len(nKeys) < iteratorKeyMinCacheSize {
-			if !iter.ValidForPrefix(prefix) {
-				return nKeys, nil
-			}
-
-			item := iter.Item()
-			key := item.KeyCopy(nil)
-			// no currentRow on indexes as it refers to multiple rows
-			// remove index prefix for matching
-			ok, err := s.matchesAllCriteria(criteria, key[len(prefix):], true, "", nil)
-			if err != nil {
-				return nil, err
-			}
-
-			if ok {
-				err = item.Value(func(v []byte) error {
-					// append the slice of keys stored in the index
-					var keys = make(KeyList, 0)
-					err := s.decode(v, &keys)
-					if err != nil {
-						return err
-					}
-
-					nKeys = append(nKeys, [][]byte(keys)...)
-					return nil
-				})
-				if err != nil {
-					return nil, err
-				}
-			}
-
-			i.lastSeek = key
-			iter.Next()
-
-		}
-		return nKeys, nil
-
-	}
-
-	return i
+	_ = "STUB: not implemented"
+	return nil
 }
 
-func (i *iterator) createBookmark() *iterBookmark {
-	return &iterBookmark{
-		iter:    i.iter,
-		seekKey: i.lastSeek,
-	}
-}
+// can't use indexes on matchFuncs as the entire record isn't available for testing in the passed
+// in function
+
+// Key field or index not specified - test key against criteria (if it exists) or return everything
+
+// nothing to check return key for value testing
+
+// indexed field, get keys from index
+
+// no currentRow on indexes as it refers to multiple rows
+// remove index prefix for matching
+
+// append the slice of keys stored in the index
+
+func (i *iterator) createBookmark() *iterBookmark { _ = "STUB: not implemented"; return nil }
 
 // Next returns the next key value that matches the iterators criteria
 // If no more kv's are available the return nil, if there is an error, they return nil
 // and iterator.Error() will return the error
-func (i *iterator) Next() (key []byte, value []byte) {
-	if i.err != nil {
-		return nil, nil
-	}
-
-	if len(i.keyCache) == 0 {
-		newKeys, err := i.nextKeys(i.iter)
-		if err != nil {
-			i.err = err
-			return nil, nil
-		}
-
-		if len(newKeys) == 0 {
-			return nil, nil
-		}
-
-		i.keyCache = append(i.keyCache, newKeys...)
-	}
-
-	key = i.keyCache[0]
-	i.keyCache = i.keyCache[1:]
-
-	item, err := i.tx.Get(key)
-	if err != nil {
-		i.err = err
-		return nil, nil
-	}
-
-	err = item.Value(func(val []byte) error {
-		value = val
-		return nil
-	})
-	if err != nil {
-		i.err = err
-		return nil, nil
-	}
-
-	return
-}
+func (i *iterator) Next() (key []byte, value []byte) { _ = "STUB: not implemented"; return nil, nil }
 
 // Error returns the last error, iterator.Next() will not continue if there is an error present
-func (i *iterator) Error() error {
-	return i.err
-}
+func (i *iterator) Error() error { _ = "STUB: not implemented"; return nil }
 
-func (i *iterator) Close() {
-	if i.bookmark != nil {
-		i.iter.Seek(i.bookmark.seekKey)
-		return
-	}
-
-	i.iter.Close()
-}
+func (i *iterator) Close() { _ = "STUB: not implemented"; return }
